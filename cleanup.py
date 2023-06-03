@@ -82,6 +82,7 @@ for i, pack in enumerate(packs[:-1]):
                 package = dbpf.Package.unpack(file_path)
                 
                 #looping from the end of the package to avoid the problems that occur the list index when popping elements from the list
+                changed = False
                 for j in reversed(range(0, len(package.entries))):
                     entry = package.entries[j]
                     
@@ -90,7 +91,6 @@ for i, pack in enumerate(packs[:-1]):
                     else:
                         tgir = (entry.type, entry.group, entry.instance, 0)
                         
-                    changed = False
                     #we check against newer expansions, and if the same entry exists in a later expansion, then we can delete it from the older expansion
                     #remember, the packs list has been sorted by date from the oldest date to the newest date
                     for pack2 in packs[(i + 1):]:

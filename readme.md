@@ -2,7 +2,7 @@
 
 This is an experimental script that reduces the size of the game by removing redundant/unused entries from the files of the Sims 2 Ultimate Collection.
 
-It eliminates approximately 2.4 GB from the game.
+It eliminates approximately 2.75 GB worth of data from the game, about 23% of the game's size.
 
 It uses my [sims2lib](https://github.com/lingeringwillx/sims2lib) and [structio](https://github.com/lingeringwillx/StructIO) libraries.
 
