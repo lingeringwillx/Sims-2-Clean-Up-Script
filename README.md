@@ -14,4 +14,4 @@ Run the script with the first argument being the game's directory.
 
 `python cleanup.py game_directory`
 
-If your game directory is in C:\\\\Program Files then you might need to copy the files to another locaton first.
+If your game directory is in C:\\\\Program Files then you might need to copy the files to another location first.
