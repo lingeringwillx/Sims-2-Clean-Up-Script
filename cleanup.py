@@ -81,7 +81,7 @@ for i, pack in enumerate(packs[:-1]):
                 
                 package = dbpf.Package.unpack(file_path)
                 
-                #looping from the end of the package to avoid the problems that occur the list index when popping elements from the list
+                #looping from the end of the package to avoid the problems that occur to the list when popping elements while looping
                 changed = False
                 for j in reversed(range(0, len(package.entries))):
                     entry = package.entries[j]
@@ -101,7 +101,7 @@ for i, pack in enumerate(packs[:-1]):
                             
                 if changed:
                     #write the new package with removed redundant entries into a temporary file, then overwrite the original file (safer file writing procedure)
-                    temp_path = file_path.rsplit('.', 1)[0] + 'tmp'
+                    temp_path = file_path.rsplit('.', 1)[0] + '.tmp'
                     package.pack_into(temp_path)
                     os.replace(temp_path, file_path)
                     
