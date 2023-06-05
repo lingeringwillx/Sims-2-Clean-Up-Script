@@ -38,10 +38,10 @@ packs.append(Pack('Apartment Life', 'EP8', datetime.date(2008, 8, 26), 'Apartmen
 packs.append(Pack('Family Fun Stuff', 'SP1', datetime.date(2006, 4, 13), 'Fun with Pets\\SP1'))
 packs.append(Pack('Glamour Life Stuff', 'SP3', datetime.date(2006, 8, 31), 'Glamour Life Stuff'))
 packs.append(Pack('Celebration! Stuff', 'SP4', datetime.date(2007, 4, 3), 'Double Deluxe\\SP4'))
-packs.append(Pack('H&M Fashion Stuff', 'SP5', datetime.date(2007, 5, 5), 'Best of Business\\SP5'))
+packs.append(Pack('H&M Fashion Stuff', 'SP5', datetime.date(2007, 6, 5), 'Best of Business\\SP5'))
 packs.append(Pack('Teen Style Stuff', 'SP6', datetime.date(2007, 9, 5), 'University Life\\SP6'))
 packs.append(Pack('Kitchen & Bath Interior Design Stuff', 'SP7', datetime.date(2008, 4, 15), 'Best of Business\\SP7'))
-packs.append(Pack('IKEA Home Stuff', 'SP8', datetime.date(2008, 5, 25), 'University Life\\SP8'))
+packs.append(Pack('IKEA Home Stuff', 'SP8', datetime.date(2008, 6, 24), 'University Life\\SP8'))
 packs.append(Pack('Mansions & Garden Stuff', 'SP9', datetime.date(2008, 9, 17), 'Fun with Pets\\SP9'))
 
 packs.sort(key=lambda pack: pack.date) #sort by date
