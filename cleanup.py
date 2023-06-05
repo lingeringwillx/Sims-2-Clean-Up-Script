@@ -3,6 +3,11 @@ import dbpf
 import os
 import sys
 
+def log(text):
+    print(text)
+    with open('cleanup_log.txt', 'a') as log_file:
+        log_file.write(text + '\n')
+
 #game directory:
 base_dir = sys.argv[1]
 
@@ -62,17 +67,23 @@ for pack in packs[1:]:
                 #we can exploit fast dictionary and set lookups to find out if a certain TGIR exists in a certain package file
                 pack.entry_sets[file] = set()
                 for entry in package.entries:
-                    if 'resource' in entry:
-                        pack.entry_sets[file].add((entry.type, entry.group, entry.instance, entry.resource))
-                    else:
-                        pack.entry_sets[file].add((entry.type, entry.group, entry.instance, 0))
-                        
-print()
+                    #don't add the directory of compressed files
+                    if entry.type != 0xE86B1EEF:
+                        if 'resource' in entry:
+                            pack.entry_sets[file].add((entry.type, entry.group, entry.instance, entry.resource))
+                        else:
+                            pack.entry_sets[file].add((entry.type, entry.group, entry.instance, 0))
+                            
+#delete log from last run
+if os.path.isfile('cleanup_log.txt'):
+    os.remove('cleanup_log.txt')
+    
+print('')
 print('Deleting entries:')
 
 #we can skip the last expansion as it has the latest files
 for i, pack in enumerate(packs[:-1]):
-    print(pack.name)
+    log(pack.name)
     for root, dirs, files in os.walk(os.path.join(base_dir, pack.path)):
         for file in files:
             if file.endswith('.package'):
@@ -106,6 +117,6 @@ for i, pack in enumerate(packs[:-1]):
                     os.replace(temp_path, file_path)
                     
                     new_size = os.path.getsize(file_path) / (10 ** 6)
-                    print('{}, {:0.2f} MB -> {:0.2f} MB'.format(os.path.relpath(file_path, base_dir), old_size, new_size))
+                    log('{}, {:0.2f} MB -> {:0.2f} MB'.format(os.path.relpath(file_path, base_dir), old_size, new_size))
                     
-    print()
+    log('')
