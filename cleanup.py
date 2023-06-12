@@ -7,7 +7,21 @@ def log(text):
     print(text)
     with open('cleanup_log.txt', 'a') as log_file:
         log_file.write(text + '\n')
-
+        
+def get_total_size(base_dir):
+    total = 0
+    for root, dirs, files in os.walk(base_dir):
+        for file in files:
+            total += os.path.getsize(os.path.join(root, file))
+            
+    return total / 1024 ** 3 #GB
+    
+def get_key(file, root):
+    if file == 'Wants.package':
+        return os.path.join(os.path.basename(root), file)
+    else:
+        return file
+        
 #game directory:
 base_dir = sys.argv[1]
 
@@ -65,19 +79,25 @@ for pack in packs[1:]:
                 
                 #the entry set is a dictionary with the keys being the names of the package files found in each SP/EP, each value is a set of tuples containing the TGIRs of each entry in the package
                 #we can exploit fast dictionary and set lookups to find out if a certain TGIR exists in a certain package file
-                pack.entry_sets[file] = set()
+                #there is two Wants.package files in each pack, so we need to add special code for them
+                key = get_key(file, root)
+                pack.entry_sets[key] = set()
+                
                 for entry in package.entries:
                     #don't add the directory of compressed files
                     if entry.type != 0xE86B1EEF:
                         if 'resource' in entry:
-                            pack.entry_sets[file].add((entry.type, entry.group, entry.instance, entry.resource))
+                            pack.entry_sets[key].add((entry.type, entry.group, entry.instance, entry.resource))
                         else:
-                            pack.entry_sets[file].add((entry.type, entry.group, entry.instance, 0))
+                            pack.entry_sets[key].add((entry.type, entry.group, entry.instance, 0))
                             
 #delete log from last run
 if os.path.isfile('cleanup_log.txt'):
     os.remove('cleanup_log.txt')
     
+#get old game size
+total_old = get_total_size(base_dir)
+
 print('')
 print('Deleting entries:')
 
@@ -88,9 +108,8 @@ for i, pack in enumerate(packs[:-1]):
         for file in files:
             if file.endswith('.package'):
                 file_path = os.path.join(root, file)
-                old_size = os.path.getsize(file_path) / (10 ** 6) #file size in MBs
-                
-                package = dbpf.Package.unpack(file_path)
+                package = dbpf.Package.unpack(os.path.join(root, file))
+                key = get_key(file, root)
                 
                 #looping from the end of the package to avoid the problems that occur to the list when popping elements while looping
                 changed = False
@@ -105,18 +124,40 @@ for i, pack in enumerate(packs[:-1]):
                     #we check against newer expansions, and if the same entry exists in a later expansion, then we can delete it from the older expansion
                     #remember, the packs list has been sorted by date from the oldest date to the newest date
                     for pack2 in packs[(i + 1):]:
-                        if file in pack2.entry_sets and tgir in pack2.entry_sets[file]:
+                        if key in pack2.entry_sets and tgir in pack2.entry_sets[key]:
                             package.entries.pop(j)
                             changed = True
                             break
                             
                 if changed:
-                    #write the new package with removed redundant entries into a temporary file, then overwrite the original file (safer file writing procedure)
-                    temp_path = file_path.rsplit('.', 1)[0] + '.tmp'
-                    package.pack_into(temp_path)
-                    os.replace(temp_path, file_path)
+                    n_entries = len(package.entries)
                     
-                    new_size = os.path.getsize(file_path) / (10 ** 6)
-                    log('{}, {:0.2f} MB -> {:0.2f} MB'.format(os.path.relpath(file_path, base_dir), old_size, new_size))
-                    
+                    #if the package has no entries remaining, or only the directory of compressed files remains then delete the file
+                    if n_entries == 0 or (n_entries == 1 and package.entries[0].type == 0xE86B1EEF):
+                        size = os.path.getsize(file_path) / (1024 ** 2) #MB
+                        os.remove(file_path)
+                        log('{}, {:0.2f} MB -> 0.00 MB'.format(os.path.relpath(file_path, base_dir), size))
+                        
+                    #otherwise write the new package with removed redundant entries into a temporary file, then overwrite the original file (safer file writing procedure)
+                    else:
+                        old_size = os.path.getsize(file_path) / (1024 ** 2)
+                        
+                        temp_path = file_path.rsplit('.', 1)[0] + '.tmp'
+                        package.pack_into(temp_path)
+                        os.replace(temp_path, file_path)
+                        
+                        new_size = os.path.getsize(file_path) / (1024 ** 2)
+                        
+                        log('{}, {:0.2f} MB -> {:0.2f} MB'.format(os.path.relpath(file_path, base_dir), old_size, new_size))
+                        
     log('')
+    
+#delete empty directories
+for root, files, dirs in os.walk(base_dir):
+    if len(files) + len(dirs) == 0:
+        os.rmdir(root)
+        
+#get new game size
+total_new = get_total_size(base_dir)
+
+log('Total: {:0.2f} GB -> {:0.2f} GB, {:0.2f} GB, {:0.2f}%\n'.format(total_old, total_new, total_old - total_new, total_new / total_old * 100))
