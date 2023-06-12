@@ -17,10 +17,12 @@ def get_total_size(base_dir):
     return total / 1024 ** 3 #GB
     
 def get_key(file, root):
-    if file == 'Wants.package':
-        return os.path.join(os.path.basename(root), file)
+    folder = os.path.basename(root)
+    #base game has a different name for the folder containing the assets
+    if folder == 'Sims3D':
+        return os.path.join('3D', file)
     else:
-        return file
+        return os.path.join(folder, file)
         
 #game directory:
 base_dir = sys.argv[1]
@@ -79,7 +81,6 @@ for pack in packs[1:]:
                 
                 #the entry set is a dictionary with the keys being the names of the package files found in each SP/EP, each value is a set of tuples containing the TGIRs of each entry in the package
                 #we can exploit fast dictionary and set lookups to find out if a certain TGIR exists in a certain package file
-                #there is two Wants.package files in each pack, so we need to add special code for them
                 key = get_key(file, root)
                 pack.entry_sets[key] = set()
                 
