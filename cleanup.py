@@ -96,7 +96,7 @@ for pack in packs[1:]:
 if os.path.isfile('cleanup_log.txt'):
     os.remove('cleanup_log.txt')
     
-#get old game size
+#get current game size
 total_old = get_total_size(base_dir)
 
 print('')
