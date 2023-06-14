@@ -155,7 +155,7 @@ for i, pack in enumerate(packs[:-1]):
     log('')
     
 #delete empty directories
-for root, files, dirs in os.walk(base_dir):
+for root, files, dirs in os.walk(base_dir, topdown=False):
     if len(files) + len(dirs) == 0:
         os.rmdir(root)
         
