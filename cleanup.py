@@ -16,14 +16,15 @@ def get_total_size(base_dir):
             
     return total / 1024 ** 3 #GB
     
-def get_key(file, root):
-    folder = os.path.basename(root)
-    #base game has a different name for the folder containing the assets
-    if folder == 'Sims3D':
-        return os.path.join('3D', file)
-    else:
-        return os.path.join(folder, file)
+#relative path to file excluding pack folder
+def get_key(file_path, pack):
+    key = os.path.relpath(file_path, os.path.join(base_dir, pack.path))
+    #base game has a different folder name for the game assets
+    if key.startswith('TSData\\Res\\Sims3D'):
+        key = key.replace('Sims3D', '3D')
         
+    return key
+    
 #game directory:
 base_dir = sys.argv[1]
 
@@ -81,7 +82,7 @@ for pack in packs[1:]:
                 
                 #the entry set is a dictionary with the keys being the names of the package files found in each SP/EP, each value is a set of tuples containing the TGIRs of each entry in the package
                 #we can exploit fast dictionary and set lookups to find out if a certain TGIR exists in a certain package file
-                key = get_key(file, root)
+                key = get_key(file_path, pack)
                 pack.entry_sets[key] = set()
                 
                 for entry in package.entries:
@@ -90,7 +91,7 @@ for pack in packs[1:]:
                         if 'resource' in entry:
                             pack.entry_sets[key].add((entry.type, entry.group, entry.instance, entry.resource))
                         else:
-                            pack.entry_sets[key].add((entry.type, entry.group, entry.instance, 0))
+                            pack.entry_sets[key].add((entry.type, entry.group, entry.instance))
                             
 #delete log from last run
 if os.path.isfile('cleanup_log.txt'):
@@ -110,7 +111,7 @@ for i, pack in enumerate(packs[:-1]):
             if file.endswith('.package'):
                 file_path = os.path.join(root, file)
                 package = dbpf.Package.unpack(os.path.join(root, file))
-                key = get_key(file, root)
+                key = get_key(file_path, pack)
                 
                 #looping from the end of the package to avoid the problems that occur to the list when popping elements while looping
                 changed = False
@@ -120,7 +121,7 @@ for i, pack in enumerate(packs[:-1]):
                     if 'resource' in entry:
                         tgir = (entry.type, entry.group, entry.instance, entry.resource)
                     else:
-                        tgir = (entry.type, entry.group, entry.instance, 0)
+                        tgir = (entry.type, entry.group, entry.instance)
                         
                     #we check against newer expansions, and if the same entry exists in a later expansion, then we can delete it from the older expansion
                     #remember, the packs list has been sorted by date from the oldest date to the newest date
