@@ -8,13 +8,21 @@ def log(text):
     with open('cleanup_log.txt', 'a') as log_file:
         log_file.write(text + '\n')
         
-def get_total_size(base_dir):
+def get_dir_size(base_dir):
     total = 0
     for root, dirs, files in os.walk(base_dir):
         for file in files:
             total += os.path.getsize(os.path.join(root, file))
             
-    return total / 1024 ** 3 #GB
+    return total / 1024 ** 2 #MB
+    
+def get_total_size():
+    total = 0
+    for pack in packs:
+        pack_path = os.path.join(base_dir, pack.path)
+        if os.path.isdir(pack_path):
+            total += get_dir_size(pack_path)
+    return total / 1024 #GB
     
 #relative path to file excluding pack folder
 def get_key(file_path, pack):
@@ -38,7 +46,7 @@ class Pack:
         self.code = code
         self.date = date
         self.path = path
-        self.entry_sets = {}
+        self.entries_set = {}
         
     def __repr__(self):
         return '{}, {}'.format(self.name, self.date)
@@ -68,98 +76,96 @@ packs.append(Pack('Mansions & Garden Stuff', 'SP9', datetime.date(2008, 9, 17), 
 
 packs.sort(key=lambda pack: pack.date) #sort by date
 
-print('Collecting data...')
-
-#collect infromation on the types, groups, instances, and resources (TGIRs) of entries found in package files
-#later, we will be checking newer EPs and SPs for matching TGIRs and if a match is found, then we will delete the entry from the older package files
-#there is no need to collect information on the packages of the base game since we are only checking against later expansions
-for pack in packs[1:]:
-    for root, dirs, files in os.walk(os.path.join(base_dir, pack.path)):
-        for file in files:
-            if file.endswith('.package'):
-                file_path = os.path.join(root, file)
-                package = dbpf.Package.unpack(file_path)
-                
-                #the entry set is a dictionary with the keys being the names of the package files found in each SP/EP, each value is a set of tuples containing the TGIRs of each entry in the package
-                #we can exploit fast dictionary and set lookups to find out if a certain TGIR exists in a certain package file
-                key = get_key(file_path, pack)
-                pack.entry_sets[key] = set()
-                
-                for entry in package.entries:
-                    #don't add the directory of compressed files
-                    if entry.type != 0xE86B1EEF:
-                        if 'resource' in entry:
-                            pack.entry_sets[key].add((entry.type, entry.group, entry.instance, entry.resource))
-                        else:
-                            pack.entry_sets[key].add((entry.type, entry.group, entry.instance))
-                            
 #delete log from last run
 if os.path.isfile('cleanup_log.txt'):
     os.remove('cleanup_log.txt')
     
-#get current game size
-total_old = get_total_size(base_dir)
+total_old = get_total_size()
 
-print('')
-print('Deleting entries:')
-
-#we can skip the last expansion as it has the latest files
-for i, pack in enumerate(packs[:-1]):
-    log(pack.name)
-    for root, dirs, files in os.walk(os.path.join(base_dir, pack.path)):
-        for file in files:
-            if file.endswith('.package'):
-                file_path = os.path.join(root, file)
-                package = dbpf.Package.unpack(os.path.join(root, file))
-                key = get_key(file_path, pack)
-                
-                #looping from the end of the package to avoid the problems that occur to the list when popping elements while looping
-                changed = False
-                for j in reversed(range(0, len(package.entries))):
-                    entry = package.entries[j]
-                    
-                    if 'resource' in entry:
-                        tgir = (entry.type, entry.group, entry.instance, entry.resource)
-                    else:
-                        tgir = (entry.type, entry.group, entry.instance)
-                        
-                    #we check against newer expansions, and if the same entry exists in a later expansion, then we can delete it from the older expansion
-                    #remember, the packs list has been sorted by date from the oldest date to the newest date
-                    for pack2 in packs[(i + 1):]:
-                        if key in pack2.entry_sets and tgir in pack2.entry_sets[key]:
-                            package.entries.pop(j)
-                            changed = True
-                            break
-                            
-                if changed:
-                    n_entries = len(package.entries)
-                    
-                    #if the package has no entries remaining, or only the directory of compressed files remains then delete the file
-                    if n_entries == 0 or (n_entries == 1 and package.entries[0].type == 0xE86B1EEF):
-                        size = os.path.getsize(file_path) / (1024 ** 2) #MB
-                        os.remove(file_path)
-                        log('{}, {:0.2f} MB -> 0.00 MB'.format(os.path.relpath(file_path, base_dir), size))
-                        
-                    #otherwise write the new package with removed redundant entries into a temporary file, then overwrite the original file (safer file writing procedure)
-                    else:
-                        old_size = os.path.getsize(file_path) / (1024 ** 2)
-                        
-                        temp_path = file_path.rsplit('.', 1)[0] + '.tmp'
-                        package.pack_into(temp_path)
-                        os.replace(temp_path, file_path)
-                        
-                        new_size = os.path.getsize(file_path) / (1024 ** 2)
-                        
-                        log('{}, {:0.2f} MB -> {:0.2f} MB'.format(os.path.relpath(file_path, base_dir), old_size, new_size))
-                        
-    log('')
+#collect infromation on the types, groups, instances, and resources (TGIRs) of entries found in package files
+#later, we will be checking newer EPs and SPs for matching TGIRs and if a match is found, then we will delete the entry from the older package files
+#starting from last pack
+for i in reversed(range(len(packs))):
+    pack = packs[i]
+    pack_path = os.path.join(base_dir, pack.path)
     
+    if os.path.isdir(pack_path):
+        last_pack = i == len(packs) - 1
+        if not last_pack:
+            log(pack.name)
+            
+        for root, dirs, files in os.walk(pack_path):
+            for file in files:
+                #delete unused ealogo_audio.movie files
+                if not last_pack and file == 'ealogo_audio.movie':
+                    file_path = os.path.join(root, file)
+                    size = os.path.getsize(file_path) / (1024 ** 2) #MB
+                    os.remove(file_path)
+                    log('{}, {:0.2f} MB -> 0.00 MB'.format(os.path.relpath(file_path, base_dir), size))
+                    
+                elif file.endswith('.package'):
+                    file_path = os.path.join(root, file)
+                    package = dbpf.Package.unpack(file_path)
+                    
+                    #the entries set is a dictionary with the keys being the names of the package files found in each SP/EP, each value is a set of tuples containing the TGIRs of each entry in the package
+                    #we can exploit fast dictionary and set lookups to find out if a certain TGIR exists in a certain package file
+                    key = get_key(file_path, pack)
+                    pack.entries_set[key] = set()
+                    
+                    #looping from the end of the package to avoid the problems that occur to the list when popping elements while looping
+                    changed = False
+                    for j in reversed(range(len(package.entries))):
+                        entry = package.entries[j]
+                        
+                        #don't add the directory of compressed files
+                        if entry.type != 0xE86B1EEF:
+                            #add entry info to entries_set
+                            if 'resource' in entry:
+                                tgir = (entry.type, entry.group, entry.instance, entry.resource)
+                                pack.entries_set[key].add(tgir)
+                            else:
+                                tgir = (entry.type, entry.group, entry.instance)
+                                pack.entries_set[key].add(tgir)
+                                
+                            #we can skip the last expansion as it has the latest files
+                            if not last_pack:
+                                #we check against newer expansions, and if the same entry exists in a later expansion, then we can delete it from the older expansion
+                                #remember, the packs list has been sorted by date from the oldest date to the newest date
+                                for pack2 in packs[(i + 1):]:
+                                    if key in pack2.entries_set and tgir in pack2.entries_set[key]:
+                                        package.entries.pop(j)
+                                        changed = True
+                                        break
+                                        
+                    if changed:
+                        n_entries = len(package.entries)
+                        
+                        #if the package has no entries remaining, or only the directory of compressed files remains then delete the file
+                        if n_entries == 0 or (n_entries == 1 and package.entries[0].type == 0xE86B1EEF):
+                            size = os.path.getsize(file_path) / (1024 ** 2)
+                            os.remove(file_path)
+                            log('{}, {:0.2f} MB -> 0.00 MB'.format(os.path.relpath(file_path, base_dir), size))
+                            
+                        #otherwise write the new package with removed redundant entries into a temporary file, then overwrite the original file (safer file writing procedure)
+                        else:
+                            old_size = os.path.getsize(file_path) / (1024 ** 2)
+                            
+                            temp_path = file_path.rsplit('.', 1)[0] + '.tmp'
+                            package.pack_into(temp_path)
+                            os.replace(temp_path, file_path)
+                            
+                            new_size = os.path.getsize(file_path) / (1024 ** 2)
+                            log('{}, {:0.2f} MB -> {:0.2f} MB'.format(os.path.relpath(file_path, base_dir), old_size, new_size))
+                            
+        if not last_pack:
+            log('')
+            
 #delete empty directories
-for root, files, dirs in os.walk(base_dir, topdown=False):
-    if len(files) + len(dirs) == 0:
+for root, dirs, files in os.walk(base_dir, topdown=False):
+    if len(dirs) + len(files) == 0:
         os.rmdir(root)
         
 #get new game size
-total_new = get_total_size(base_dir)
+total_new = get_total_size()
 
 log('Total: {:0.2f} GB -> {:0.2f} GB, {:0.2f} GB, {:0.2f}%\n'.format(total_old, total_new, total_old - total_new, total_new / total_old * 100))
