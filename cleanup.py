@@ -128,16 +128,14 @@ for i in reversed(range(len(packs))):
                                 tgir = (entry.type, entry.group, entry.instance)
                                 pack.entries_set[key].add(tgir)
                                 
-                            #we can skip the last expansion as it has the latest files
-                            if not last_pack:
-                                #we check against newer expansions, and if the same entry exists in a later expansion, then we can delete it from the older expansion
-                                #remember, the packs list has been sorted by date from the oldest date to the newest date
-                                for pack2 in packs[(i + 1):]:
-                                    if key in pack2.entries_set and tgir in pack2.entries_set[key]:
-                                        package.entries.pop(j)
-                                        changed = True
-                                        break
-                                        
+                            #we check against newer expansions, and if the same entry exists in a later expansion, then we can delete it from the older expansion
+                            #remember, the packs list has been sorted by date from the oldest date to the newest date
+                            for pack2 in packs[(i + 1):]:
+                                if key in pack2.entries_set and tgir in pack2.entries_set[key]:
+                                    package.entries.pop(j)
+                                    changed = True
+                                    break
+                                    
                     if changed:
                         n_entries = len(package.entries)
                         
