@@ -22,6 +22,7 @@ def get_total_size():
         pack_path = os.path.join(base_dir, pack.path)
         if os.path.isdir(pack_path):
             total += get_dir_size(pack_path)
+            
     return total / 1024 #GB
     
 #relative path to file excluding pack folder
