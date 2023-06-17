@@ -8,22 +8,16 @@ def log(text):
     with open('cleanup_log.txt', 'a') as log_file:
         log_file.write(text + '\n')
         
-def get_dir_size(base_dir):
-    total = 0
-    for root, dirs, files in os.walk(base_dir):
-        for file in files:
-            total += os.path.getsize(os.path.join(root, file))
-            
-    return total / 1024 ** 2 #MB
-    
 def get_total_size():
     total = 0
     for pack in packs:
         pack_path = os.path.join(base_dir, pack.path)
         if os.path.isdir(pack_path):
-            total += get_dir_size(pack_path)
-            
-    return total / 1024 #GB
+            for root, dirs, files in os.walk(base_dir):
+                for file in files:
+                    total += os.path.getsize(os.path.join(root, file))
+                    
+    return total / 1024 ** 3 #GB
     
 #relative path to file excluding pack folder
 def get_key(file_path, pack):
