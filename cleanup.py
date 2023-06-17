@@ -85,7 +85,7 @@ total_old = get_total_size()
 
 #collect infromation on the types, groups, instances, and resources (TGIRs) of entries found in package files
 #later, we will be checking newer EPs and SPs for matching TGIRs and if a match is found, then we will delete the entry from the older package files
-#starting from last pack
+#starting from the last pack
 for i in reversed(range(len(packs))):
     pack = packs[i]
     last_pack = i == len(packs) - 1
