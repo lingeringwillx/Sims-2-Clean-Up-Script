@@ -110,11 +110,11 @@ for i in reversed(range(len(packs))):
                             #add entry info to entries_set
                             if 'resource' in entry:
                                 tgir = (entry.type, entry.group, entry.instance, entry.resource)
-                                pack.entries_set[key].add(tgir)
                             else:
                                 tgir = (entry.type, entry.group, entry.instance)
-                                pack.entries_set[key].add(tgir)
                                 
+                            pack.entries_set[key].add(tgir)
+                            
                             #we check against newer expansions, and if the same entry exists in a later expansion, then we can delete it from the older expansion
                             #remember, the packs list has been sorted by date from the oldest date to the newest date
                             for pack2 in packs[(i + 1):]:
