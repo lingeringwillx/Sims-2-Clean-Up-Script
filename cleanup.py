@@ -97,14 +97,7 @@ for i in reversed(range(len(packs))):
             
         for root, dirs, files in os.walk(pack_path):
             for file in files:
-                #delete unused ealogo_audio.movie files
-                if not last_pack and file == 'ealogo_audio.movie':
-                    file_path = os.path.join(root, file)
-                    size = os.path.getsize(file_path) / (1024 ** 2) #MB
-                    os.remove(file_path)
-                    log('{}, {:0.2f} MB -> 0.00 MB'.format(os.path.relpath(file_path, base_dir), size))
-                    
-                elif file.endswith('.package'):
+                if file.endswith('.package'):
                     file_path = os.path.join(root, file)
                     package = dbpf.Package.unpack(file_path)
                     
