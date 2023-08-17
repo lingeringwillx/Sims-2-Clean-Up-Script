@@ -110,7 +110,7 @@ for i in reversed(range(len(packs))):
                     entry = package.entries[j]
                     
                     #no overrides occur to group 0xffffffff + don't add the directory of compressed files
-                    if entry.group != 0xFFFFFFFF or entry.type != 0xE86B1EEF:
+                    if entry.group != 0xFFFFFFFF and entry.type != 0xE86B1EEF:
                         #add entry info to entries_set
                         if 'resource' in entry:
                             tgir = (entry.type, entry.group, entry.instance, entry.resource)
