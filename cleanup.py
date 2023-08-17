@@ -70,9 +70,9 @@ if not os.path.isdir(base_dir):
     raise FileNotFoundError('Directory {} not found'.format(base_dir))
     
 #remove pack from list if not found in directory
-for pack in packs:
-    if not os.path.isdir(os.path.join(base_dir, pack.path)):
-        packs.remove(pack)
+for i in reversed(range(len(packs))):
+    if not os.path.isdir(os.path.join(base_dir, packs[i].path)):
+        packs.pop(i)
         
 if len(packs) == 0:
     raise FileNotFoundError('No expansion packs or stuff packs found in {}'.format(base_dir))
@@ -109,8 +109,8 @@ for i in reversed(range(len(packs))):
                 for j in reversed(range(len(package.entries))):
                     entry = package.entries[j]
                     
-                    #don't add the directory of compressed files
-                    if entry.type != 0xE86B1EEF:
+                    #no overrides occur to group 0xffffffff + don't add the directory of compressed files
+                    if entry.group != 0xFFFFFFFF and entry.type != 0xE86B1EEF:
                         #add entry info to entries_set
                         if 'resource' in entry:
                             tgir = (entry.type, entry.group, entry.instance, entry.resource)

@@ -1,4 +1,4 @@
-from .structio import Struct, StructIO
+from structio import Struct, StructIO
 import string as strlib
 import ctypes
 import os
@@ -74,11 +74,20 @@ class ExtendedStruct(Struct):
         return self.pack_7bint(len(b)) + b
         
 class MemoryIO(StructIO):
-    def __init__(self, b=b'', endian='little', struct=ExtendedStruct):
-        super().__init__(b, endian, struct=struct)
+    def __init__(self, b=b'', endian='little'):
+        super().__init__(b)
+        self._struct = ExtendedStruct(endian)
+        
+    def copy(self):
+        return MemoryIO(self.getvalue(), self._struct.endian)
+        
+    def _get_7bstr_len(self):
+        return self._struct._get_7bstr_len(self.getvalue(), start=self.tell())
         
     def read_7bstr(self):
-        return self._read(self._struct.unpack_7bstr, ())
+        value, length = self._struct.unpack_7bstr(self.getvalue(), start=self.tell())
+        self.seek(length, 1)
+        return value
         
     def write_7bstr(self, string):
         return self.write(self._struct.pack_7bstr(string))
@@ -87,7 +96,14 @@ class MemoryIO(StructIO):
         return self.append(self._struct.pack_7bstr(string))
         
     def overwrite_7bstr(self, string):
-        return self._overwrite(self._struct._get_7bstr_len, (), self._struct.pack_7bstr, (string,))
+        start = self.tell()
+        return self.overwrite(start, start + self._get_7bstr_len(), self._struct.pack_7bstr(string))
+        
+    def skip_7bstr(self):
+        return self.seek(self._get_7bstr_len(), 1)
+        
+    def delete_7bstr(self):
+        return self.delete(self._get_7bstr_len())
         
 class Header:
     def __init__(self):
@@ -164,9 +180,9 @@ class Entry(MemoryIO):
             
     def copy(self):
         if hasattr(self, 'resource'):
-            return Entry(self.type, self.group, self.instance, self.resource, self.name, self.read_all(), self.compressed)
+            return Entry(self.type, self.group, self.instance, self.resource, self.name, self.buffer, self.compressed)
         else:
-            return Entry(self.type, self.group, self.instance, name=self.name, content=self.read_all(), compressed=self.compressed)
+            return Entry(self.type, self.group, self.instance, name=self.name, content=self.buffer, compressed=self.compressed)
             
     #using C++ library from moreawesomethanyou   
     def compress(self):
@@ -174,7 +190,7 @@ class Entry(MemoryIO):
             return self
             
         else:
-            src = self.read_all()
+            src = self.buffer
             src_len = len(src)
             dst = ctypes.create_string_buffer(src_len)
             
@@ -189,7 +205,7 @@ class Entry(MemoryIO):
     #using C++ library from moreawesomethanyou 
     def decompress(self):
         if self.compressed:
-            src = self.read_all()
+            src = self.buffer
             compressed_size = len(src)
             
             self.seek(6)
@@ -213,31 +229,35 @@ class Entry(MemoryIO):
             return self
         
     def read_name(self):
-        if self.type in named_types:
-            self.name = partial_decompress(self, 64).read().rstrip(b'x\00').decode('utf-8', errors='ignore')
-            
-        elif self.type in named_rcol_types:
-            file = partial_decompress(self, 255)
-            location = file.find(b'cSGResource')
-            
-            if location != -1:
-                file.seek(location + 19)
-                self.name = file.read_7bstr()
+        try:
+            if self.type in named_types:
+                self.name = partial_decompress(self, 64).read().rstrip(b'x\00').decode('utf-8', errors='ignore')
                 
-        elif self.type in named_cpf_types:
-            file = partial_decompress(self)
-            location = file.find(b'\x18\xea\x8b\x0b\x04\x00\x00\x00name')
-            
-            if location != -1:
-                file.seek(location + 12)
-                self.name = file.read_pstr(4)
+            elif self.type in named_rcol_types:
+                file = partial_decompress(self)
+                location = file.find(b'cSGResource')
                 
-        elif self.type in lua_types:
-            file = partial_decompress(self, 255)
-            file.seek(4)
-            self.name = file.read_pstr(4)        
-            
-        else:
+                if location != -1:
+                    file.seek(location + 19)
+                    self.name = file.read_7bstr()
+                    
+            elif self.type in named_cpf_types:
+                file = partial_decompress(self)
+                location = file.find(b'\x18\xea\x8b\x0b\x04\x00\x00\x00name')
+                
+                if location != -1:
+                    file.seek(location + 12)
+                    self.name = file.read_pstr(4)
+                    
+            elif self.type in lua_types:
+                file = partial_decompress(self)
+                file.seek(4)
+                self.name = file.read_pstr(4)        
+                
+            else:
+                self.name = ''
+                
+        except:
             self.name = ''
             
         return self.name
@@ -382,8 +402,7 @@ class Package:
         results = search(self.entries, 0xE86B1EEF, get_first=True)
         
         if len(results) > 0:
-            i = results[0]
-            clst = self.entries[i]
+            clst = results[0]
             file_size = len(clst)
             
             if self.header.index_minor_version == 2:
@@ -429,22 +448,48 @@ class Package:
                     pass
                     
         #read file names
-        """
         for entry in self.entries:
             try:
+                #print(entry)
                 entry.read_name()
             except CompressionError:
                 pass
-        """
-        
-        return self
+                
+        return self 
         
     def pack_into(self, file_path, compress=False):
         #compress entries
         if compress:
+            compressed_entries = {} #for checking if the a compressed entry with the same TGI already exists
+            for i, entry in enumerate(self.entries):
+                if 'resource' in entry:
+                    tgi = (entry.type, entry.group, entry.instance, entry.resource)
+                else:
+                    tgi = (entry.type, entry.group, entry.instance)
+                    
+                if tgi in compressed_entries:
+                    i = compressed_entries[tgi]
+                    self.entries[i].decompress()
+                    
+                else:
+                    entry.compress()
+                    compressed_entries[tgi] = i
+                    
+        #only check for repeated compressed entries
+        else:
+            compressed_entries = set()
             for entry in self.entries:
-                entry.compress()
-                
+                if entry.compressed:
+                    if 'resource' in entry:
+                        tgi = (entry.type, entry.group, entry.instance, entry.resource)
+                    else:
+                        tgi = (entry.type, entry.group, entry.instance)
+                        
+                    if tgi in compressed_entries:
+                        raise RepeatKeyError('Repeat compressed entry found in package')
+                    else:
+                        compressed_entries.add(tgi)
+                        
         #use index minor version 2?
         if self.header.index_minor_version != 2:
             for entry in self.entries:
@@ -479,7 +524,7 @@ class Package:
         compressed_files = [entry for entry in self.entries if entry.compressed]
         
         if len(results) > 0:
-            self.entries.pop(results[0])
+            self.entries.remove(results[0])
             
         if len(compressed_files) > 0:
             clst = Entry(0xE86B1EEF, 0xE86B1EEF, 0x286B1F03)
@@ -510,7 +555,7 @@ class Package:
             #get new location to put in the index later
             entry.location = file.tell()
             
-            file.write(entry.read_all())
+            file.write(entry.buffer)
             
             #get new file size to put in the index later
             entry.size = file.tell() - entry.location
@@ -544,11 +589,11 @@ class Package:
         file.write_int(0, 12) #hole index entries
         
         with open(file_path, 'wb') as fs:
-            fs.write(file.read_all())
+            fs.write(file.buffer)
             
 def partial_decompress(entry, size=-1):
     if entry.compressed:
-        src = entry.read_all()  
+        src = entry.buffer  
         compressed_size = len(src)
         
         entry.seek(6)
@@ -573,17 +618,11 @@ def partial_decompress(entry, size=-1):
         entry.seek(0)
         return MemoryIO(buffer)
         
-def walk(path):
-    for root, dirs, files in os.walk(path):
-        for file in files:
-            if file.endswith('.package'):
-                yield os.path.join(root, file)
-                
 def search(entries, type_id=-1, group_id=-1, instance_id=-1, resource_id=-1, entry_name='', get_first=False):
     entry_name = entry_name.lower()
     
-    indices = []
-    for i, entry in enumerate(entries):
+    results = []
+    for entry in entries:
         if type_id != -1 and type_id != entry.type:
             continue
             
@@ -599,12 +638,12 @@ def search(entries, type_id=-1, group_id=-1, instance_id=-1, resource_id=-1, ent
         if entry_name != '' and entry_name not in entry.name.lower():
             continue
             
-        indices.append(i)
+        results.append(entry)
         
         if get_first:
-            return indices
+            return results
             
-    return indices
+    return results
     
 #for faster searching
 def build_index(entries):
@@ -651,7 +690,7 @@ def build_index(entries):
     return index
     
 #faster search
-def index_search(index, type_id=-1, group_id=-1, instance_id=-1, resource_id=-1, entry_name=''):
+def index_search(entries, index, type_id=-1, group_id=-1, instance_id=-1, resource_id=-1, entry_name=''):
     results = []
     keys = ['types', 'groups', 'instances', 'resources']
     values = [type_id, group_id, instance_id, resource_id]
@@ -677,6 +716,6 @@ def index_search(index, type_id=-1, group_id=-1, instance_id=-1, resource_id=-1,
             results = set.intersection(*names_set)
             
         if len(entry_name) > 1:
-            return [i for i in results if entry_name in index['names list'][i]]
+            results = [i for i in results if entry_name in index['names list'][i]]
             
-    return list(results)
+    return [entries[i] for i in results]
