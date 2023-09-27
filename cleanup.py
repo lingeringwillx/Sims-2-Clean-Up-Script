@@ -109,8 +109,11 @@ for i in reversed(range(len(packs))):
                 for j in reversed(range(len(package.entries))):
                     entry = package.entries[j]
                     
-                    #no overrides occur to group 0xffffffff + don't add the directory of compressed files
-                    if entry.group != 0xFFFFFFFF and entry.type != 0xE86B1EEF:
+                    #no overrides occur to group 0xffffffff
+                    #don't add the directory of compressed files
+                    #ignore propery sets and the overlay XMLs
+                    #deleting them causes items to appear in CAS with a later pack rather than their actual pack
+                    if entry.group != 0xFFFFFFFF and entry.type not in {0xE86B1EEF, 0xEBCF3E27, 0x0C1FE246, 0x2C1FD8A1}:
                         #add entry info to entries_set
                         if 'resource' in entry:
                             tgir = (entry.type, entry.group, entry.instance, entry.resource)
