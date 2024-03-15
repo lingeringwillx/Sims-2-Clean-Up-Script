@@ -4,7 +4,7 @@ This is an experimental script that reduces the size of the game by removing red
 
 It eliminates approximately 2.44 GB worth of data from the game, which is about 20% of the game's size.
 
-It uses my [sims2lib](https://github.com/lingeringwillx/sims2lib) and [structio](https://github.com/lingeringwillx/StructIO) libraries.
+It uses my [sims2py](https://github.com/lingeringwillx/sims2py) and [structio](https://github.com/lingeringwillx/StructIO) libraries.
 
 ### Assumptions
 
