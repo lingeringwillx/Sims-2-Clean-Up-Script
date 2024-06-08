@@ -17,3 +17,7 @@ Run the script with the first argument being the game's directory.
 `python cleanup.py game_directory`
 
 If your game directory is in `C:\\Program Files` then you might need to copy the files to another locaton first.
+
+### Known Issues
+
+There are some known difficulties with using SimPE for mesh extraction on the cleaned files. Also, you will not be able to access older versions of behavior files as those have been deleted. Hence, for CC makers and modders, it's better to use the full game.
